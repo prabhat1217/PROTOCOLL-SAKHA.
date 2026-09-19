@@ -3,8 +3,12 @@ name: Build PROTOCOL SAKHA Android APK
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -14,34 +18,42 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: '22'
+          package-manager-cache: false
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
 
-      - name: Install dependencies
-        run: npm install
+      - name: Verify project files
+        run: |
+          echo "Checking V4 project..."
+          test -f package.json
+          test -f index.html
+          echo "package.json and index.html found."
 
-      - name: Prepare web assets
+      - name: Install npm dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Prepare Capacitor web directory
         run: |
           rm -rf www
           mkdir -p www
           cp index.html www/
 
           if [ -d "assets" ]; then
-            cp -R assets www/
+            cp -R assets www/assets
           fi
 
           if [ -f "logo.png" ]; then
-            cp logo.png www/
+            cp logo.png www/logo.png
           fi
 
           if [ -f "icon.png" ]; then
-            cp icon.png www/
+            cp icon.png www/icon.png
           fi
 
       - name: Create Capacitor configuration
@@ -50,22 +62,26 @@ jobs:
           {
             "appId": "in.gujaratpolice.protocoldutyrotation",
             "appName": "PROTOCOLL SAKHA",
-            "webDir": "www",
-            "bundledWebRuntime": false
+            "webDir": "www"
           }
           EOF
 
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Sync Capacitor Android
+      - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build Android APK
+      - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Verify APK
+        run: |
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: PROTOCOL-SAKHA-V4-APK
