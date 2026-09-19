@@ -23,15 +23,12 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Check project files
+      - name: Check files
         run: |
-          echo "=== Repository files ==="
-          find . -maxdepth 3 -type f | sort
-          echo "=== package.json ==="
           test -f package.json
-          cat package.json
-          echo "=== index.html ==="
           test -f index.html
+          test -f icon-only.png
+          echo "All required files found."
 
       - name: Install dependencies
         run: |
@@ -41,20 +38,17 @@ jobs:
         run: |
           rm -rf www
           mkdir -p www
-
-          cp index.html www/
+          cp -R index.html www/
 
           if [ -d assets ]; then
             cp -R assets www/
           fi
 
-          if [ -f logo.png ]; then
-            cp logo.png www/
-          fi
-
-          if [ -f icon.png ]; then
-            cp icon.png www/
-          fi
+          for f in logo.png icon.png icon-only.png; do
+            if [ -f "$f" ]; then
+              cp "$f" www/
+            fi
+          done
 
       - name: Create Capacitor configuration
         run: |
@@ -62,23 +56,34 @@ jobs:
           {
             "appId": "in.gujaratpolice.protocoldutyrotation",
             "appName": "PROTOCOLL SAKHA",
-            "webDir": "www"
+            "webDir": "www",
+            "server": {
+              "androidScheme": "https"
+            },
+            "loggingBehavior": "none"
           }
           EOF
 
-          cat capacitor.config.json
-
       - name: Create Android project
         run: |
-          if [ ! -d android ]; then
-            npx cap add android
-          fi
+          npx cap add android
 
-      - name: Sync Capacitor Android
+      - name: Generate Android icons
+        run: |
+          mkdir -p resources
+          cp icon-only.png resources/icon-only.png
+
+          npx capacitor-assets generate --android
+
+      - name: Sync Capacitor
         run: |
           npx cap sync android
 
-      - name: Build Android APK
+      - name: Verify Android app name
+        run: |
+          grep -R "PROTOCOLL SAKHA" android/app/src/main 2>/dev/null || true
+
+      - name: Build APK
         working-directory: android
         run: |
           chmod +x gradlew
